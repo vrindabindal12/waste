@@ -1,6 +1,6 @@
-import { db } from './dbConfig';
-import { Users, Reports, Rewards, CollectedWastes, Notifications, Transactions } from './schema';
-import { eq, sql, and, desc, ne } from 'drizzle-orm';
+import { db } from "./dbConfig";
+import { Users, Reports, Rewards, CollectedWastes, Notifications, Transactions } from "./schema";
+import { eq, sql, and, desc, ne } from "drizzle-orm";
 
 export async function createUser(email: string, name: string) {
   try {
@@ -28,7 +28,6 @@ export async function createReport(
   wasteType: string,
   amount: string,
   imageUrl?: string,
-  type?: string,
   verificationResult?: any
 ) {
   try {
@@ -46,18 +45,15 @@ export async function createReport(
       .returning()
       .execute();
 
-    // Award 10 points for reporting waste
     const pointsEarned = 10;
     await updateRewardPoints(userId, pointsEarned);
 
-    // Create a transaction for the earned points
-    await createTransaction(userId, 'earned_report', pointsEarned, 'Points earned for reporting waste');
+    await createTransaction(userId, "earned_report", pointsEarned, "Points earned for reporting waste");
 
-    // Create a notification for the user
     await createNotification(
       userId,
       `You've earned ${pointsEarned} points for reporting waste!`,
-      'reward'
+      "reward"
     );
 
     return report;
@@ -81,14 +77,18 @@ export async function getOrCreateReward(userId: number) {
   try {
     let [reward] = await db.select().from(Rewards).where(eq(Rewards.userId, userId)).execute();
     if (!reward) {
-      [reward] = await db.insert(Rewards).values({
-        userId,
-        name: 'Default Reward',
-        collectionInfo: 'Default Collection Info',
-        points: 0,
-        level: 1,
-        isAvailable: true,
-      }).returning().execute();
+      [reward] = await db
+        .insert(Rewards)
+        .values({
+          userId,
+          name: "Default Reward",
+          collectionInfo: "Default Collection Info",
+          points: 0,
+          level: 1,
+          isAvailable: true,
+        })
+        .returning()
+        .execute();
     }
     return reward;
   } catch (error) {
@@ -101,9 +101,9 @@ export async function updateRewardPoints(userId: number, pointsToAdd: number) {
   try {
     const [updatedReward] = await db
       .update(Rewards)
-      .set({ 
+      .set({
         points: sql`${Rewards.points} + ${pointsToAdd}`,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(Rewards.userId, userId))
       .returning()
@@ -158,12 +158,11 @@ export async function createNotification(userId: number, message: string, type: 
 
 export async function getUnreadNotifications(userId: number) {
   try {
-    return await db.select().from(Notifications).where(
-      and(
-        eq(Notifications.userId, userId),
-        eq(Notifications.isRead, false)
-      )
-    ).execute();
+    return await db
+      .select()
+      .from(Notifications)
+      .where(and(eq(Notifications.userId, userId), eq(Notifications.isRead, false)))
+      .execute();
   } catch (error) {
     console.error("Error fetching unread notifications:", error);
     return [];
@@ -233,9 +232,9 @@ export async function getWasteCollectionTasks(limit: number = 20) {
       .limit(limit)
       .execute();
 
-    return tasks.map(task => ({
+    return tasks.map((task) => ({
       ...task,
-      date: task.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
+      date: task.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD
     }));
   } catch (error) {
     console.error("Error fetching waste collection tasks:", error);
@@ -249,17 +248,16 @@ export async function saveReward(userId: number, amount: number) {
       .insert(Rewards)
       .values({
         userId,
-        name: 'Waste Collection Reward',
-        collectionInfo: 'Points earned from waste collection',
+        name: "Waste Collection Reward",
+        collectionInfo: "Points earned from waste collection",
         points: amount,
         level: 1,
         isAvailable: true,
       })
       .returning()
       .execute();
-    
-    // Create a transaction for this reward
-    await createTransaction(userId, 'earned_collect', amount, 'Points earned for collecting waste');
+
+    await createTransaction(userId, "earned_collect", amount, "Points earned for collecting waste");
 
     return reward;
   } catch (error) {
@@ -276,7 +274,7 @@ export async function saveCollectedWaste(reportId: number, collectorId: number, 
         reportId,
         collectorId,
         collectionDate: new Date(),
-        status: 'verified',
+        status: "verified",
       })
       .returning()
       .execute();
@@ -331,7 +329,7 @@ export async function getAllRewards() {
 
 export async function getRewardTransactions(userId: number) {
   try {
-    console.log('Fetching transactions for user ID:', userId)
+    console.log("Fetching transactions for user ID:", userId);
     const transactions = await db
       .select({
         id: Transactions.id,
@@ -346,14 +344,14 @@ export async function getRewardTransactions(userId: number) {
       .limit(10)
       .execute();
 
-    console.log('Raw transactions from database:', transactions)
+    console.log("Raw transactions from database:", transactions);
 
-    const formattedTransactions = transactions.map(t => ({
+    const formattedTransactions = transactions.map((t) => ({
       ...t,
-      date: t.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
+      date: t.date.toISOString().split("T")[0], // Format date as YYYY-MM-DD
     }));
 
-    console.log('Formatted transactions:', formattedTransactions)
+    console.log("Formatted transactions:", formattedTransactions);
     return formattedTransactions;
   } catch (error) {
     console.error("Error fetching reward transactions:", error);
@@ -363,17 +361,15 @@ export async function getRewardTransactions(userId: number) {
 
 export async function getAvailableRewards(userId: number) {
   try {
-    console.log('Fetching available rewards for user:', userId);
-    
-    // Get user's total points
+    console.log("Fetching available rewards for user:", userId);
+
     const userTransactions = await getRewardTransactions(userId);
     const userPoints = userTransactions.reduce((total, transaction) => {
-      return transaction.type.startsWith('earned') ? total + transaction.amount : total - transaction.amount;
+      return transaction.type.startsWith("earned") ? total + transaction.amount : total - transaction.amount;
     }, 0);
 
-    console.log('User total points:', userPoints);
+    console.log("User total points:", userPoints);
 
-    // Get available rewards from the database
     const dbRewards = await db
       .select({
         id: Rewards.id,
@@ -386,21 +382,20 @@ export async function getAvailableRewards(userId: number) {
       .where(eq(Rewards.isAvailable, true))
       .execute();
 
-    console.log('Rewards from database:', dbRewards);
+    console.log("Rewards from database:", dbRewards);
 
-    // Combine user points and database rewards
     const allRewards = [
       {
-        id: 0, // Use a special ID for user's points
+        id: 0,
         name: "Your Points",
         cost: userPoints,
         description: "Redeem your earned points",
-        collectionInfo: "Points earned from reporting and collecting waste"
+        collectionInfo: "Points earned from reporting and collecting waste",
       },
-      ...dbRewards
+      ...dbRewards,
     ];
 
-    console.log('All available rewards:', allRewards);
+    console.log("All available rewards:", allRewards);
     return allRewards;
   } catch (error) {
     console.error("Error fetching available rewards:", error);
@@ -408,7 +403,12 @@ export async function getAvailableRewards(userId: number) {
   }
 }
 
-export async function createTransaction(userId: number, type: 'earned_report' | 'earned_collect' | 'redeemed', amount: number, description: string) {
+export async function createTransaction(
+  userId: number,
+  type: "earned_report" | "earned_collect" | "redeemed",
+  amount: number,
+  description: string
+) {
   try {
     const [transaction] = await db
       .insert(Transactions)
@@ -425,11 +425,11 @@ export async function createTransaction(userId: number, type: 'earned_report' | 
 export async function redeemReward(userId: number, rewardId: number) {
   try {
     const userReward = await getOrCreateReward(userId) as any;
-    
+
     if (rewardId === 0) {
-      // Redeem all points
-      const [updatedReward] = await db.update(Rewards)
-        .set({ 
+      const [updatedReward] = await db
+        .update(Rewards)
+        .set({
           points: 0,
           updatedAt: new Date(),
         })
@@ -437,20 +437,19 @@ export async function redeemReward(userId: number, rewardId: number) {
         .returning()
         .execute();
 
-      // Create a transaction for this redemption
-      await createTransaction(userId, 'redeemed', userReward.points, `Redeemed all points: ${userReward.points}`);
+      await createTransaction(userId, "redeemed", userReward.points, `Redeemed all points: ${userReward.points}`);
 
       return updatedReward;
     } else {
-      // Existing logic for redeeming specific rewards
       const availableReward = await db.select().from(Rewards).where(eq(Rewards.id, rewardId)).execute();
 
       if (!userReward || !availableReward[0] || userReward.points < availableReward[0].points) {
         throw new Error("Insufficient points or invalid reward");
       }
 
-      const [updatedReward] = await db.update(Rewards)
-        .set({ 
+      const [updatedReward] = await db
+        .update(Rewards)
+        .set({
           points: sql`${Rewards.points} - ${availableReward[0].points}`,
           updatedAt: new Date(),
         })
@@ -458,8 +457,7 @@ export async function redeemReward(userId: number, rewardId: number) {
         .returning()
         .execute();
 
-      // Create a transaction for this redemption
-      await createTransaction(userId, 'redeemed', availableReward[0].points, `Redeemed: ${availableReward[0].name}`);
+      await createTransaction(userId, "redeemed", availableReward[0].points, `Redeemed: ${availableReward[0].name}`);
 
       return updatedReward;
     }
@@ -472,7 +470,7 @@ export async function redeemReward(userId: number, rewardId: number) {
 export async function getUserBalance(userId: number): Promise<number> {
   const transactions = await getRewardTransactions(userId);
   const balance = transactions.reduce((acc, transaction) => {
-    return transaction.type.startsWith('earned') ? acc + transaction.amount : acc - transaction.amount
+    return transaction.type.startsWith("earned") ? acc + transaction.amount : acc - transaction.amount;
   }, 0);
-  return Math.max(balance, 0); // Ensure balance is never negative
+  return Math.max(balance, 0);
 }
